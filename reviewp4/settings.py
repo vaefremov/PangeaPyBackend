@@ -15,6 +15,6 @@ DB_DATABASE = conf["DB_DATABASE"]
 DB_POOL_SZ = conf.getint("DB_POOL_SZ", 4)
 
 ENABLE_GZIP = conf.getboolean('ENABLE_GZIP', False)
-GZIP_MINIMUM_SIZE = conf.get('GZIP_MINIMUM_SIZE', 1000)
+GZIP_MINIMUM_SIZE = conf.getint('GZIP_MINIMUM_SIZE', 1000)
 
 LOG_LEVEL = conf.getint('LOG_LEVEL', logging.INFO)
