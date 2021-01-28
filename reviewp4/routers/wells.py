@@ -257,6 +257,9 @@ def getWellMethodsList(project_name: str, well_name: str, req: Request, long:boo
 
 @router.get('/method_data/{project_name}/{well_name:path}')
 def getWellMethodData(project_name: str, well_name: str, method_name:str, req: Request, db = Depends(get_connection)):
+    """Outputs single well method data. The output may be in json or in msgpack format according to the
+    Accept header (application/json or application/octet-stream).
+    """
     start_time = time.time()
 
     prid = db.getProjectByName(project_name)
