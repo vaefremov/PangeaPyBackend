@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, Header, Request, Response
+from fastapi import APIRouter, Depends, Header, Request, Response, Query
+from fastapi.responses import StreamingResponse
 import logging
 import time
 import base64
 import tempfile
 import os
-from typing import Optional
+from typing import Optional, List
 import pickle
 
 import reviewp4.utilities.well_utils as well_utils
@@ -288,3 +289,20 @@ def getWellMethodData(project_name: str, well_name: str, method_name:str, req: R
     if output_packed:
         return Response(content=msgpack.packb(ans), media_type='application/octet-stream')
     return ans
+
+async def methods_data_iter(db, prid: int, wid:int, methods: List[str]):
+    for method_name in methods:
+        log.debug('Outputting method %s', method_name)
+        data = well_utils.readWellMethodDataFromDB(None, projRoot, db, wid, method_name, encodeb64=False)
+        data = msgpack.packb(data)
+        yield data
+
+
+@router.get('/stream_data/{project_name}/{well_name:path}')
+async def streamWellMethodsData(project_name: str, well_name: str,  req: Request, mn: List[str] = Query(...), db = Depends(get_connection)) -> StreamingResponse:
+    """Outputs data of multiple well methods as a stream (sequence) of msgpack messages.
+    """
+    log.debug('Stream data params: project %s; well %s; methods %s', project_name, well_name, mn)
+    prid = db.getProjectByName(project_name)
+    wid = db.getContainerByName(prid, 'wel1', well_name)
+    return StreamingResponse(methods_data_iter(db, prid, wid, mn), media_type='application/octet-stream')

@@ -329,6 +329,8 @@ def  createEmptyData(format):
     elif format in ["boundary_method", "layers_method", "lithology_method", 'saturation_method',  
                     'stratigraphy', 'measurement', 'test_results_method', 'coring_method', "layer_model"]:
         return [[], format]
+    elif format is None:
+        return [[], 'None']
     else:
         raise RuntimeError("Unsupported format to make empty data object: %s" % format)
 
@@ -552,7 +554,11 @@ def storeMethodData2Db(serv_instance, db,  well_name, w_path, method_name, mid, 
         pass
 
 def readWellMethodDataFromDB(loger, projRoot, db, wid, method_name, encodeb64=True):
-    mid = db.getContainerByName(wid, 'weld', method_name)
+    try:
+        mid = db.getContainerByName(wid, 'weld', method_name)
+    except DBException as ex:
+        log.error('Unable to get method %s, returning empty method: %s', method_name, ex)
+        return createEmptyData(None)
     try:
         format = db.getContainerSingleAttribute(mid, 'format')
     except DBException as ex:
