@@ -291,22 +291,23 @@ def getWellMethodData(project_name: str, well_name: str, method_name:str, req: R
         return Response(content=msgpack.packb(ans), media_type='application/octet-stream')
     return ans
 
-async def methods_data_iter(db, prid: int, wid:int, methods: List[str]):
+async def methods_data_iter(db, prid: int, well_name: str, wid:int, methods: List[str]):
     for method_name in methods:
         log.debug('Outputting method %s', method_name)
         data = well_utils.readWellMethodDataFromDB(None, projRoot, db, wid, method_name, encodeb64=False)
-        data = msgpack.packb(data)
+        data = msgpack.packb([well_name, method_name, data])
         yield data
 
 
 @router.get('/stream_data/{project_name}/{well_name:path}')
 async def streamWellMethodsData(project_name: str, well_name: str,  req: Request, mn: List[str] = Query(...), db = Depends(get_connection)) -> StreamingResponse:
-    """Outputs data of multiple well methods as a stream (sequence) of msgpack messages.
+    """Outputs data of multiple well methods as a stream (sequence) of msgpack messages. Every message has the following format:
+    [well_name, method_name, method_data]. This makes the output compatible with stream_multiwell_data.
     """
     log.debug('Stream data params: project %s; well %s; methods %s', project_name, well_name, mn)
     prid = db.getProjectByName(project_name)
     wid = db.getContainerByName(prid, 'wel1', well_name)
-    return StreamingResponse(methods_data_iter(db, prid, wid, mn), media_type='application/octet-stream')
+    return StreamingResponse(methods_data_iter(db, prid, well_name, wid, mn), media_type='application/octet-stream')
 
 async def multiwell_methods_data_iter(db, prid: int, wells_and_meth: List[models.WellMethodsList]):
     for w in wells_and_meth:
