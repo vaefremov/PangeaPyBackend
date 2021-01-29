@@ -10,6 +10,7 @@ import pickle
 
 import reviewp4.utilities.well_utils as well_utils
 import reviewp4.db_internals.p4dbexceptions as p4dbexceptions
+import reviewp4.models as models
 
 import msgpack
 
@@ -306,3 +307,18 @@ async def streamWellMethodsData(project_name: str, well_name: str,  req: Request
     prid = db.getProjectByName(project_name)
     wid = db.getContainerByName(prid, 'wel1', well_name)
     return StreamingResponse(methods_data_iter(db, prid, wid, mn), media_type='application/octet-stream')
+
+async def multiwell_methods_data_iter(db, prid: int, wells_and_meth: List[models.WellMethodsList]):
+    for w in wells_and_meth:
+        wid = db.getContainerByName(prid, 'wel1', w.well)
+        for method_name in w.methods:
+            data = well_utils.readWellMethodDataFromDB(None, projRoot, db, wid, method_name, encodeb64=False)
+            yield msgpack.packb([w.well, method_name, data])
+
+
+@router.post('/stream_multiwell_data/{project_name}')
+async def streamWellsMethods(project_name: str, body: List[models.WellMethodsList], db = Depends(get_connection)):
+    log.debug('Multiwell stream: %s', project_name)
+    log.debug('Request body: %s', body)
+    prid = db.getProjectByName(project_name)
+    return StreamingResponse(multiwell_methods_data_iter(db, prid, body), media_type='application/octet-stream')
