@@ -301,7 +301,9 @@ async def methods_data_iter(db, prid: int, well_name: str, wid:int, methods: Lis
 
 
 @router.get('/stream_data/{project_name}/{well_name:path}')
-async def streamWellMethodsData(project_name: str, well_name: str,  req: Request, mn: List[str] = Query(...), db = Depends(get_connection)) -> StreamingResponse:
+async def streamWellMethodsData(project_name: str, well_name: str,  req: Request, 
+        mn: List[str] = Query(..., description='methods names'), 
+                        db = Depends(get_connection)) -> StreamingResponse:
     """Outputs data of multiple well methods as a stream (sequence) of msgpack messages. Every message has the following format:
     [well_name, method_name, method_data]. This makes the output compatible with stream_multiwell_data.
     """
