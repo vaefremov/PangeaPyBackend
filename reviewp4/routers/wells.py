@@ -319,9 +319,12 @@ async def multiwell_methods_data_iter(db, prid: int, wells_and_meth: List[models
 
 @router.post('/stream_multiwell_data/{project_name}')
 async def streamWellsMethods(project_name: str, body: List[models.WellMethodsList], db = Depends(get_connection)):
-    """Outputs log methods data for mutiple wells/methods. 
-    The output is a sequence (streamed) of 3-element lists in the following form: [well_name, method_name, method_data],
+    """Outputs log methods data for multiple wells/methods. 
+    The output is a sequence (streamed) of 3-element lists in the following format: [well_name, method_name, method_data],
     where method_data coincides with the format output the method_data entry point. Each element if msgpack encoded.
+    The input (POST request body) is expected as json in the following format: [{"well": well_name1, "methods": [mn1, mn2, ...]}, ...],
+    where mn1, mn2, ... stand for methods names to be output from the well_name1. Eg: 
+    [{"well": "11","methods": ["ASP", "IMP_ok 1"]}, {"well": "4", "methods": ["IMP_ok 1","A4M0_5N", 'АК']}]
     """
     log.debug('Multiwell stream: %s', project_name)
     log.debug('Request body: %s', body)
