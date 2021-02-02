@@ -12,6 +12,7 @@ import reviewp4.utilities.well_utils as well_utils
 from reviewp4.utilities.gen_utils import _createOrGetGeologicalObjects
 import reviewp4.db_internals.p4dbexceptions as p4dbexceptions
 import reviewp4.models as models
+import pangea
 
 import msgpack
 
@@ -324,3 +325,37 @@ async def streamWellsMethods(project_name: str, body: List[models.WellMethodsLis
     log.debug('Request body: %s', body)
     prid = db.getProjectByName(project_name)
     return StreamingResponse(multiwell_methods_data_iter(db, prid, body), media_type='application/octet-stream')
+
+@router.get('/method_info/{project_name}/{well_name}')
+def getWellMethodInfo(project_name:str, well_name: str, 
+            method_name:str = Query(..., alias='mn', description='method name'), info_name:str = None, db = Depends(get_connection)):
+    """Retrieves additional information about log method. If info_name is None, all parameters defined
+    for log method mehod_name are returned.
+    Return: list [('info_name1', value, units, comment), ...}
+    Value type may differ (but currently only strings are returned).
+    """
+    start_time = time.time()
+    assert (pangea.misc_util.stringIsSQLCorrect(method_name)), 'Invalid characters in method name: %s' % method_name
+    prid = db.getProjectByName(project_name)
+    wid = db.getContainerByName(prid, 'wel1', well_name)
+    try:
+        mid_prot_owner = db.getContainerProtectionOwnerByName(wid, ['weld', 'wbnd'], method_name)
+    except p4dbexceptions.DBNotFoundException:
+        log.error('No such method: %s in well %s', method_name, well_name)
+        return []
+    mid = mid_prot_owner[0]
+    hasTimeData = int((db.getContainerType(mid)[0] == 'wbnd') or bool(len(db.getContainerSingleAttributeWithDefault(mid, 'path', ''))))
+    ans = [['#owner#', mid_prot_owner[2] or '', '', ''], ['#protected#', mid_prot_owner[1], '', ''], ['#hasTimeData#', hasTimeData, '', '']]
+    try:
+        conts_l = db.getSubContainersListWithAttributesMissingAsNone(mid, 'wmif', ['value', 'uom', 'comment'])
+    except KeyError:
+        conts_l = []
+    for c in conts_l:
+        value, uom, comment = c[2:]
+        name = c[1]
+        if len(name) == 0 or name[0] == '#':
+            continue   # Skip special names that could had infiltrated into the database
+        if (info_name is None) or (info_name == name):
+            ans.append( (name, value or '', uom or '', comment or '') )
+    log.debug('getWellMethodInfo lasted %s', (time.time() - start_time))
+    return ans
