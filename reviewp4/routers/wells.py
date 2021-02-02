@@ -9,6 +9,7 @@ from typing import Optional, List
 import pickle
 
 import reviewp4.utilities.well_utils as well_utils
+from reviewp4.utilities.gen_utils import _createOrGetGeologicalObjects
 import reviewp4.db_internals.p4dbexceptions as p4dbexceptions
 import reviewp4.models as models
 
@@ -17,22 +18,6 @@ import msgpack
 from ..dependencies import get_connection, extract_name_from_header
 
 log = logging.getLogger(__name__)
-
-# Utilities functions to move elsewhere
-def _createOrGetGeologicalObjects(db, prid):
-    """Return ID of geo1 container. Create one if it is missing.
-    """
-    try:
-        geo_id = db.getContainerByName(prid, 'geo1', 'Geological Objects')
-    except p4dbexceptions.DBException:
-        geo_id = db.createContainer(prid, 'geo1', 'Geological Objects')
-        log.warning("Geological Objects container created")
-    try:
-        sid = db.getContainerByName(geo_id, 'str1', 'default')
-    except p4dbexceptions.DBException:
-        geo_id = db.createContainer(geo_id, 'str1', 'default')
-        log.warning("Stratigraphy Objects container created")
-    return geo_id
 
 router = APIRouter(tags=['wells'])
 
@@ -296,6 +281,9 @@ async def methods_data_iter(db, prid: int, well_name: str, wid:int, methods: Lis
     for method_name in methods:
         log.debug('Outputting method %s', method_name)
         data = well_utils.readWellMethodDataFromDB(None, projRoot, db, wid, method_name, encodeb64=False)
+        if data[1] == 'None':
+            log.debug('fall back to boundaries')
+            data = well_utils.readBoundariesMethodFromDb(db, wid, method_name)
         data = msgpack.packb([well_name, method_name, data])
         yield data
 
@@ -317,6 +305,9 @@ async def multiwell_methods_data_iter(db, prid: int, wells_and_meth: List[models
         wid = db.getContainerByName(prid, 'wel1', w.well)
         for method_name in w.methods:
             data = well_utils.readWellMethodDataFromDB(None, projRoot, db, wid, method_name, encodeb64=False)
+            if data[1] == 'None':
+                log.debug('fall back to boundaries')
+                data = well_utils.readBoundariesMethodFromDb(db, wid, method_name)
             yield msgpack.packb([w.well, method_name, data])
 
 

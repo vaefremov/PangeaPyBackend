@@ -29,7 +29,8 @@ from xmlrpc.client import DateTime
 import base64
 import logging
 
-from reviewp4.db_internals.p4dbexceptions import DBException
+from reviewp4.db_internals.p4dbexceptions import DBException, DBNotFoundException
+from reviewp4.utilities.gen_utils import _createOrGetGeologicalObjects
 
 log = logging.getLogger(__name__)
 
@@ -649,6 +650,21 @@ def getBoundariesMethodFromDb(db, mid, geoid):
         data.append((p[0], db.getContainerName(p[1])[1] ))
     return [data, "boundary_method"]
 
+def readBoundariesMethodFromDb(db, wid: int, method_name: str):
+    """Read boundaries from db
+    """
+    try:
+        mid = db.getContainerByName(wid, 'wbnd', method_name)
+    except DBNotFoundException as ex:
+        log.error("Well method %s is not boundaries_method: %s", method_name, ex)
+        data = createEmptyData("boundary_method")
+    else:
+        try:
+            data = getBoundariesMethodFromDb(db, mid, None)
+        except DBException:
+            log.error("While retrieving boundaries method %s from %s", method_name, w.well)
+            data = createEmptyData("boundary_method")
+    return data
 
 def makeCurveDenser(d, EPS):
     """Input is a list of tuples (md, value).
