@@ -791,6 +791,28 @@ def adjustTrajectoryDIfNeeded(db_proxy, user, project_name, well_name, db, prid,
             log.warning("Trajectory changed in well %s due to change of max MD from %f to %f",well_name, maxMDwas, maxMD)
     return rc
 
+def readWellMethodInfo(db, pid: int, well_name: str, wid: int, method_name: str, info_name:str=None):
+    try:
+        mid_prot_owner = db.getContainerProtectionOwnerByName(wid, ['weld', 'wbnd'], method_name)
+    except DBNotFoundException:
+        log.error('No such method: %s in well %s', method_name, well_name)
+        return []
+    mid = mid_prot_owner[0]
+    hasTimeData = int((db.getContainerType(mid)[0] == 'wbnd') or bool(len(db.getContainerSingleAttributeWithDefault(mid, 'path', ''))))
+    ans = [['#owner#', mid_prot_owner[2] or '', '', ''], ['#protected#', mid_prot_owner[1], '', ''], ['#hasTimeData#', hasTimeData, '', '']]
+    try:
+        conts_l = db.getSubContainersListWithAttributesMissingAsNone(mid, 'wmif', ['value', 'uom', 'comment'])
+    except KeyError:
+        conts_l = []
+    for c in conts_l:
+        value, uom, comment = c[2:]
+        name = c[1]
+        if len(name) == 0 or name[0] == '#':
+            continue   # Skip special names that could have infiltrated into the database
+        if (info_name is None) or (info_name == name):
+            ans.append( (name, value or '', uom or '', comment or '') )
+    return ans
+
 if __name__ == '__main__':
     from pprint import pprint
     # Do some tests here...

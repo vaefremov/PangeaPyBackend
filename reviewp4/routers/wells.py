@@ -326,7 +326,7 @@ async def streamWellsMethods(project_name: str, body: List[models.WellMethodsLis
     prid = db.getProjectByName(project_name)
     return StreamingResponse(multiwell_methods_data_iter(db, prid, body), media_type='application/octet-stream')
 
-@router.get('/method_info/{project_name}/{well_name}')
+@router.get('/method_info/{project_name}/{well_name:path}')
 def getWellMethodInfo(project_name:str, well_name: str, 
             method_name:str = Query(..., alias='mn', description='method name'), info_name:str = None, db = Depends(get_connection)):
     """Retrieves additional information about log method. If info_name is None, all parameters defined
@@ -338,24 +338,23 @@ def getWellMethodInfo(project_name:str, well_name: str,
     assert (pangea.misc_util.stringIsSQLCorrect(method_name)), 'Invalid characters in method name: %s' % method_name
     prid = db.getProjectByName(project_name)
     wid = db.getContainerByName(prid, 'wel1', well_name)
-    try:
-        mid_prot_owner = db.getContainerProtectionOwnerByName(wid, ['weld', 'wbnd'], method_name)
-    except p4dbexceptions.DBNotFoundException:
-        log.error('No such method: %s in well %s', method_name, well_name)
-        return []
-    mid = mid_prot_owner[0]
-    hasTimeData = int((db.getContainerType(mid)[0] == 'wbnd') or bool(len(db.getContainerSingleAttributeWithDefault(mid, 'path', ''))))
-    ans = [['#owner#', mid_prot_owner[2] or '', '', ''], ['#protected#', mid_prot_owner[1], '', ''], ['#hasTimeData#', hasTimeData, '', '']]
-    try:
-        conts_l = db.getSubContainersListWithAttributesMissingAsNone(mid, 'wmif', ['value', 'uom', 'comment'])
-    except KeyError:
-        conts_l = []
-    for c in conts_l:
-        value, uom, comment = c[2:]
-        name = c[1]
-        if len(name) == 0 or name[0] == '#':
-            continue   # Skip special names that could had infiltrated into the database
-        if (info_name is None) or (info_name == name):
-            ans.append( (name, value or '', uom or '', comment or '') )
+    ans = well_utils.readWellMethodInfo(db, prid, well_name, wid, method_name, info_name)
     log.debug('getWellMethodInfo lasted %s', (time.time() - start_time))
     return ans
+
+def multiwell_methods_info_iter(db, prid: int, wells_and_meth: List[models.WellMethodsList]):
+    for w in wells_and_meth:
+        wid = db.getContainerByName(prid, 'wel1', w.well)
+        for method_name in w.methods:
+            yield [w.well, method_name, well_utils.readWellMethodInfo(db, prid, w.well, wid, method_name)]
+
+
+@router.post('/multiwell_methods_info/{project_name}')
+def getMultiwellMethodsInfo(project_name: str, body: List[models.WellMethodsList], db = Depends(get_connection)):
+    """Outputs info related to log methods in mutliple wells.
+    The output is (JSON) a list of 3-element lists: [[well_name, method_name, info_collection]] where the info_collection
+    elements are lists of 4-element lists ('info_name1', value, units, comment) similar to the output of the /wells/method_info
+    request.
+    """
+    prid = db.getProjectByName(project_name)
+    return [i for i in multiwell_methods_info_iter(db, prid, body)]
