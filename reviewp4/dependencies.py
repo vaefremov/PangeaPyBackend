@@ -1,7 +1,8 @@
 from typing import Optional
 from fastapi import Depends, Header, HTTPException
 import logging
-from .db_internals import pool
+from .db_internals import pool, ConnectionContext
+from .db_internals.p4dbexceptions import DBAuthoritiesException
 
 log = logging.getLogger(__name__)
 
@@ -12,9 +13,9 @@ def extract_name_from_header(x_pangea_user: Optional[str] = Header(None)):
     return x_pangea_user
 
 async def get_connection(user=Depends(extract_name_from_header)):
-    cn = pool.get_connection()
-    try:
-        cn.set_user(user)
+    with ConnectionContext() as cn:
+        try: 
+            cn.set_user(user)
+        except DBAuthoritiesException as ex:
+            raise HTTPException(status_code=401, detail='Wrong user: ' + ex.cause)
         yield cn
-    finally:
-        pool.return_connection(cn)

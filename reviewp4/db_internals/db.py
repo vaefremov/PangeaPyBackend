@@ -41,3 +41,14 @@ class MyConnectionsPool:
         log.debug('Connections left (return): %d', len(self.connections))
 
 pool = MyConnectionsPool(settings.DB_POOL_SZ)
+
+class ConnectionContext:
+    def __init__(self):
+        log.debug('Context conn. __init__')
+        self.db = pool.get_connection()
+
+    def __enter__(self):
+        return self.db
+
+    def __exit__(self, type, value, traceback):
+        pool.return_connection(self.db)
