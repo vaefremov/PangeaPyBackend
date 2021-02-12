@@ -13,8 +13,8 @@ def extract_name_from_header(x_pangea_user: Optional[str] = Header(None)):
 
 async def get_connection(user=Depends(extract_name_from_header)):
     cn = pool.get_connection()
-    cn.set_user(user)
     try:
+        cn.set_user(user)
         yield cn
     finally:
         pool.return_connection(cn)
