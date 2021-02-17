@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Header, Request
+from fastapi import APIRouter, Depends, Header, Request, Query
 from fastapi.responses import StreamingResponse
 import logging
 import time
@@ -46,13 +46,17 @@ async def echo1(project_name: str, req: Request, write2disk: Optional[bool] = Fa
 async def random_stream_d(n: int, chunks: int):
     cur_n = 0
     chunk_sz = n // chunks
+    if chunk_sz < 1:
+        log.error('Wrong number of chunks causing chunk size <= 0, setting chunk size to 1')
+        chunk_sz = 1
     chunk_data = b''.join([struct.pack('<d', random.random()) for _ in range(chunk_sz)])
     while cur_n < n:
         cur_n += chunk_sz
         yield chunk_data
 
 @router.get('/randomd')
-async def randomd(n:int, nchunks: Optional[int]=1):
+async def randomd(n:int=Query(..., ge=8, description='Total number of doubles to output'), 
+                nchunks: Optional[int]=Query(1, ge=1, description='Number of chunks')):
     """Outputs stream of n doubles (LSB) in chunks. Number of chunks is specified in
     the nchunks parameter. Size of double is 8, so, to output 1GB of data by chunks of 10M, n should be 125_000_000,
     number of chunks (nchunks) is 100.
@@ -66,7 +70,9 @@ async def random_stream_b(sz: int, nchunks: int):
         yield buf
 
 @router.get('/randomb')
-async def randomb(sz:int, nchunks: Optional[int]=1, cn=Depends(get_connection)):
+async def randomb(sz:int=Query(..., ge=1, description='Size of one chunk'), 
+                nchunks: Optional[int]=Query(1, ge=1, description='Number of chunks to output'), 
+                cn=Depends(get_connection)):
     """Outputs stream of byte buffers (chunks), each chunk is sz bytes long.
     Total of nchunks is output, i.e. the final data size is sz*nchunks.
     Actually, only the first chunk is generated using random numbers generator, subsequent
