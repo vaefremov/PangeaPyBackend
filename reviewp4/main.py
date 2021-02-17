@@ -24,7 +24,7 @@ def handle_auth_exception(req: Request, ex: DBAuthoritiesException):
 def handle_auth_exception(req: Request, ex: DBNotFoundException):
     return JSONResponse(status_code=400, content=ex.cause)
 
-app.include_router(misc.router)
+app.include_router(misc.router, prefix='/aux')
 app.include_router(wells.router, prefix='/wells')
 
 
