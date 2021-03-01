@@ -9,6 +9,7 @@ from typing import Optional
 import random
 import struct
 import os
+import msgpack
 
 from ..dependencies import get_connection, extract_name_from_header
 
@@ -83,3 +84,18 @@ async def randomb(sz:int=Query(..., ge=1, description='Size of one chunk'),
     """
     log.info('Outputting random bytes, chunk size %s, chunks number=%d', sz, nchunks)
     return StreamingResponse(random_stream_b(sz, nchunks), media_type='application/octet-stream')
+
+async def random_stream_msg(sz: int, nmsgs: int):
+    for _ in range(nmsgs):
+        buf = os.urandom(sz)
+        yield msgpack.dumps(buf)
+
+@router.get('/randommsg')
+async def randommsg(sz:int=Query(..., ge=1, description='Size of one chunk'), 
+                nmsgs: Optional[int]=Query(1, ge=1, description='Number of chunks to output'), 
+                cn=Depends(get_connection)):
+    """Outputs stream of messages, each message is a byte array (size is sz) of random bytes packed with MessagePack.
+    Total of nmsgs is output. Messages are generated independently, that may take some additional time.
+    """
+    log.info('Outputting random messages, message size %s, messages number=%d', sz, nmsgs)
+    return StreamingResponse(random_stream_msg(sz, nmsgs), media_type='application/octet-stream')
