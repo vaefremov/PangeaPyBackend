@@ -85,17 +85,20 @@ async def randomb(sz:int=Query(..., ge=1, description='Size of one chunk'),
     log.info('Outputting random bytes, chunk size %s, chunks number=%d', sz, nchunks)
     return StreamingResponse(random_stream_b(sz, nchunks), media_type='application/octet-stream')
 
-async def random_stream_msg(sz: int, nmsgs: int):
+async def random_stream_msg(sz: int, nmsgs: int, allrandom: bool):
+    buf = os.urandom(sz)
     for _ in range(nmsgs):
-        buf = os.urandom(sz)
         yield msgpack.dumps(buf)
+        if allrandom:
+            buf = os.urandom(sz)
 
 @router.get('/randommsg')
 async def randommsg(sz:int=Query(..., ge=1, description='Size of one chunk'), 
                 nmsgs: Optional[int]=Query(1, ge=1, description='Number of chunks to output'), 
+                allrandom: Optional[bool] = Query(False, description='Make all messages random'),
                 cn=Depends(get_connection)):
     """Outputs stream of messages, each message is a byte array (size is sz) of random bytes packed with MessagePack.
     Total of nmsgs is output. Messages are generated independently, that may take some additional time.
     """
-    log.info('Outputting random messages, message size %s, messages number=%d', sz, nmsgs)
-    return StreamingResponse(random_stream_msg(sz, nmsgs), media_type='application/octet-stream')
+    log.info('Outputting random messages, message size %s, messages number=%d, all mesages are random: %s', sz, nmsgs, allrandom)
+    return StreamingResponse(random_stream_msg(sz, nmsgs, allrandom), media_type='application/octet-stream')
