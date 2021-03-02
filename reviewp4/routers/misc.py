@@ -85,10 +85,14 @@ async def randomb(sz:int=Query(..., ge=1, description='Size of one chunk'),
     log.info('Outputting random bytes, chunk size %s, chunks number=%d', sz, nchunks)
     return StreamingResponse(random_stream_b(sz, nchunks), media_type='application/octet-stream')
 
-async def random_stream_msg(sz: int, nmsgs: int, allrandom: bool):
+async def random_stream_msg(sz: int, nmsgs: int, allrandom: bool, delimit: bool=False):
     buf = os.urandom(sz)
+    magic = b'msg1'
     for _ in range(nmsgs):
-        yield msgpack.dumps(buf)
+        msg = msgpack.dumps(buf)
+        if delimit:
+            msg = magic + struct.pack('<i', len(msg)) + msg
+        yield msg
         if allrandom:
             buf = os.urandom(sz)
 
@@ -96,9 +100,10 @@ async def random_stream_msg(sz: int, nmsgs: int, allrandom: bool):
 async def randommsg(sz:int=Query(..., ge=1, description='Size of one chunk'), 
                 nmsgs: Optional[int]=Query(1, ge=1, description='Number of chunks to output'), 
                 allrandom: Optional[bool] = Query(False, description='Make all messages random'),
+                delimit: Optional[bool] = Query(True, description='Add delimiters between messages (b"msg1" + uint32)'),
                 cn=Depends(get_connection)):
     """Outputs stream of messages, each message is a byte array (size is sz) of random bytes packed with MessagePack.
     Total of nmsgs is output. Messages are generated independently, that may take some additional time.
     """
-    log.info('Outputting random messages, message size %s, messages number=%d, all mesages are random: %s', sz, nmsgs, allrandom)
-    return StreamingResponse(random_stream_msg(sz, nmsgs, allrandom), media_type='application/octet-stream')
+    log.info('Outputting random messages, message size %s, messages number=%d, all mesages are random: %s, delimiters: %s', sz, nmsgs, allrandom, delimit)
+    return StreamingResponse(random_stream_msg(sz, nmsgs, allrandom, delimit=delimit), media_type='application/octet-stream')
