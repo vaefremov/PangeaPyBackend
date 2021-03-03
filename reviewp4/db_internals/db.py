@@ -3,7 +3,7 @@ import logging
 import warnings
 import time
 from .. import settings
-import reviewp4.db_internals.p4db as p4db
+from . import p4db
 # logging.basicConfig(level=logging.DEBUG)
 
 log = logging.getLogger(__name__)
