@@ -12,6 +12,7 @@ import os
 import msgpack
 
 from ..dependencies import get_connection, extract_name_from_header
+from ..utilities.gen_utils import pack_message
 
 log = logging.getLogger(__name__)
 
@@ -87,11 +88,8 @@ async def randomb(sz:int=Query(..., ge=1, description='Size of one chunk'),
 
 async def random_stream_msg(sz: int, nmsgs: int, allrandom: bool, delimit: bool=False):
     buf = os.urandom(sz)
-    magic = b'msg1'
     for _ in range(nmsgs):
-        msg = msgpack.dumps(buf)
-        if delimit:
-            msg = magic + struct.pack('<i', len(msg)) + msg
+        msg = pack_message(buf, add_header=delimit)
         yield msg
         if allrandom:
             buf = os.urandom(sz)
