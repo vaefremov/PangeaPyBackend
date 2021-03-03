@@ -28,7 +28,7 @@ def _createOrGetGeologicalObjects(db, prid):
 def pack_message(obj, add_header: bool = False):
     """Pack message with msgpack and add header for streaming purposes.
     """
-    res = msgpack.dumps(obj)
+    res = msgpack.packb(obj)
     if add_header:
         res = MSG_MAGIC + struct.pack('<i', len(res)) + res
     return res

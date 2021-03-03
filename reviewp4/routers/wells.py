@@ -17,6 +17,7 @@ import pangea
 import msgpack
 
 from ..dependencies import get_connection, extract_name_from_header
+from ..utilities.gen_utils import pack_message
 
 log = logging.getLogger(__name__)
 
@@ -278,30 +279,31 @@ def getWellMethodData(project_name: str, well_name: str, req: Request,
         return Response(content=msgpack.packb(ans), media_type='application/octet-stream')
     return ans
 
-async def methods_data_iter(db, prid: int, well_name: str, wid:int, methods: List[str]):
+async def methods_data_iter(db, prid: int, well_name: str, wid:int, methods: List[str], delimit: bool = False):
     for method_name in methods:
         log.debug('Outputting method %s', method_name)
         data = well_utils.readWellMethodDataFromDB(None, projRoot, db, wid, method_name, encodeb64=False)
         if data[1] == 'None':
             log.debug('fall back to boundaries')
             data = well_utils.readBoundariesMethodFromDb(db, wid, method_name)
-        data = msgpack.packb([well_name, method_name, data])
+        data = pack_message([well_name, method_name, data], delimit)
         yield data
 
 
 @router.get('/stream_data/{project_name}/{well_name:path}')
 async def streamWellMethodsData(project_name: str, well_name: str,  req: Request, 
         mn: List[str] = Query(..., description='methods names'), 
+        delimit: Optional[bool] = Query(True, description='Add delimiters between messages (b"msg1" + uint32)'),
                         db = Depends(get_connection)) -> StreamingResponse:
     """Outputs data of multiple well methods as a stream (sequence) of msgpack messages. Every message has the following format:
     [well_name, method_name, method_data]. This makes the output compatible with stream_multiwell_data.
     """
-    log.debug('Stream data params: project %s; well %s; methods %s', project_name, well_name, mn)
+    log.debug('Stream data params: project %s; well %s; methods %s; add delimiters: %s', project_name, well_name, mn, delimit)
     prid = db.getProjectByName(project_name)
     wid = db.getContainerByName(prid, 'wel1', well_name)
-    return StreamingResponse(methods_data_iter(db, prid, well_name, wid, mn), media_type='application/octet-stream')
+    return StreamingResponse(methods_data_iter(db, prid, well_name, wid, mn, delimit=delimit), media_type='application/octet-stream')
 
-async def multiwell_methods_data_iter(db, prid: int, wells_and_meth: List[models.WellMethodsList]):
+async def multiwell_methods_data_iter(db, prid: int, wells_and_meth: List[models.WellMethodsList], delimit: bool=False):
     for w in wells_and_meth:
         wid = db.getContainerByName(prid, 'wel1', w.well)
         for method_name in w.methods:
@@ -309,11 +311,13 @@ async def multiwell_methods_data_iter(db, prid: int, wells_and_meth: List[models
             if data[1] == 'None':
                 log.debug('fall back to boundaries')
                 data = well_utils.readBoundariesMethodFromDb(db, wid, method_name)
-            yield msgpack.packb([w.well, method_name, data])
+            yield pack_message([w.well, method_name, data], delimit)
 
 
 @router.post('/stream_multiwell_data/{project_name}')
-async def streamWellsMethods(project_name: str, body: List[models.WellMethodsList], db = Depends(get_connection)):
+async def streamWellsMethods(project_name: str, body: List[models.WellMethodsList], 
+        delimit: Optional[bool] = Query(True, description='Add delimiters between messages (b"msg1" + uint32)'),
+        db = Depends(get_connection)):
     """Outputs log methods data for multiple wells/methods. 
     The output is a sequence (streamed) of 3-element lists in the following format: [well_name, method_name, method_data],
     where method_data coincides with the format output the method_data entry point. Each element if msgpack encoded.
@@ -321,10 +325,10 @@ async def streamWellsMethods(project_name: str, body: List[models.WellMethodsLis
     where mn1, mn2, ... stand for methods names to be output from the well_name1. Eg: 
     [{"well": "11","methods": ["ASP", "IMP_ok 1"]}, {"well": "4", "methods": ["IMP_ok 1","A4M0_5N", 'АК']}]
     """
-    log.debug('Multiwell stream: %s', project_name)
+    log.debug('Multiwell stream: %s, add delimiters: %s', project_name, delimit)
     log.debug('Request body: %s', body)
     prid = db.getProjectByName(project_name)
-    return StreamingResponse(multiwell_methods_data_iter(db, prid, body), media_type='application/octet-stream')
+    return StreamingResponse(multiwell_methods_data_iter(db, prid, body, delimit=delimit), media_type='application/octet-stream')
 
 @router.get('/method_info/{project_name}/{well_name:path}')
 def getWellMethodInfo(project_name:str, well_name: str, 
