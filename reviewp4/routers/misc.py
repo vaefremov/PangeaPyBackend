@@ -13,6 +13,7 @@ import msgpack
 
 from ..dependencies import get_connection, extract_name_from_header
 from ..utilities.gen_utils import pack_message
+from ..utilities import random_files
 
 log = logging.getLogger(__name__)
 
@@ -105,3 +106,37 @@ async def randommsg(sz:int=Query(..., ge=1, description='Size of one chunk'),
     """
     log.info('Outputting random messages, message size %s, messages number=%d, all mesages are random: %s, delimiters: %s', sz, nmsgs, allrandom, delimit)
     return StreamingResponse(random_stream_msg(sz, nmsgs, allrandom, delimit=delimit), media_type='application/octet-stream')
+
+@router.get('/fill_cache')
+async def fill_cache(sz:int=Query(..., ge=1, description='Size of one file'), 
+                n: Optional[int]=Query(1, ge=1, description='Number of files to create')):
+    """Create pool of random files"""
+    random_files.clear()
+    random_files.create_random_files(sz, n)
+    paths = [f for f in random_files.files_names_iter()]
+    return {'n': len(paths), 'files': paths}
+
+@router.get('/cache_status')
+async def cache_status():
+    return random_files.cache_status()
+
+
+async def random_stream_files(nmsgs: int, delimit: bool=False):
+    tot_number_output = 0
+    for fn in random_files.files_names_iter():
+        tot_number_output += 1
+        if tot_number_output > nmsgs:
+            break
+        with open(fn, 'rb') as f:
+            buf = f.read()
+            msg = pack_message(buf, add_header=delimit)
+            yield msg
+
+
+@router.get('/msgs_from_files')
+async def msgs_from_files(n: Optional[int]=Query(1, ge=1, description='Number of files to output'), 
+            delimit: Optional[bool] = Query(True, description='Add delimiters between messages (b"msg1" + uint32)'), cn=Depends(get_connection)):
+    """Output cache content as a sequence of messages (optionally, with headers). Total of n messages are output, but not more than
+    number of files that are in the cache (as has been specified while updating cache content with the fill_cache method)."""
+    log.info('Outputting random messages as read from files, messages number=%d, delimiters: %s', n, delimit)
+    return StreamingResponse(random_stream_files(n, delimit=delimit), media_type='application/octet-stream')

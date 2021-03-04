@@ -17,4 +17,6 @@ DB_POOL_SZ = conf.getint("DB_POOL_SZ", 4)
 ENABLE_GZIP = conf.getboolean('ENABLE_GZIP', False)
 GZIP_MINIMUM_SIZE = conf.getint('GZIP_MINIMUM_SIZE', 1000)
 
+TEMP = conf.get('TEMP', '/opt/PANGmisc/DB_ROOT/TMP/')
+
 LOG_LEVEL = conf.getint('LOG_LEVEL', logging.INFO)
