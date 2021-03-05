@@ -3,6 +3,7 @@ import os
 import pathlib
 import logging
 import shutil
+import random
 
 LOG = logging.getLogger(__name__)
 
@@ -17,7 +18,22 @@ def create_single_file(parent_dir: pathlib.Path, nm: str, sz: int) -> None:
         f.write(prefix)
         f.write(os.urandom(sz))
 
-def create_random_files(sz:int, n: int):
+def const_size_iter(sz: int, width: float):
+    while True:
+        yield sz
+
+def equal_distr_iter(sz: int, width: float):
+    start, stop = max(0, int(sz - sz*width)), int(sz + sz*width)+1
+    while True:
+        yield random.randrange(start, stop)
+
+def create_random_files_with_distr(sz:int, n: int, distr_name: str, width: float):
+    if distr_name == 'const':
+        gen = const_size_iter(sz, width)
+    elif distr_name == 'equal':
+        gen = equal_distr_iter(sz, width)
+    else:
+        raise RuntimeError('Unknown distribution')
     work_dir = pathlib.Path(TEMP).joinpath('RandomFiles')
     work_dir.mkdir(exist_ok=True)
     cur_dir = None
@@ -25,16 +41,14 @@ def create_random_files(sz:int, n: int):
         if (i % MAX_NAMES) == 0:
             cur_dir = work_dir / str(i)
             cur_dir.mkdir(exist_ok=True)
-        LOG.debug('Creating %s in %s', i, cur_dir)
-        create_single_file(cur_dir, 'random_{}'.format(i), sz)
-
-def create_files_constant_distr(sz: int, n: int, width: float):
-    pass
+        cur_sz = next(gen)
+        LOG.debug('Creating %s in %s sz=%s', i, cur_dir, cur_sz)
+        create_single_file(cur_dir, 'random_{}'.format(i), cur_sz)
 
 def clear():
     """Remove the work dir with all its content"""
     work_dir = pathlib.Path(TEMP) / 'RandomFiles'
-    shutil.rmtree(work_dir)
+    shutil.rmtree(work_dir, ignore_errors=True)
 
 def files_names_iter():
     """Iterate over all (regular) files in work dir"""
