@@ -12,7 +12,9 @@ MAX_NAMES = 1000
 
 def create_single_file(parent_dir: pathlib.Path, nm: str, sz: int) -> None:
     path = parent_dir / nm
+    prefix = nm.encode('utf8') + b' ' + str(sz).encode('utf8') + b'\n'
     with open(path, mode='wb') as f:
+        f.write(prefix)
         f.write(os.urandom(sz))
 
 def create_random_files(sz:int, n: int):
@@ -25,6 +27,9 @@ def create_random_files(sz:int, n: int):
             cur_dir.mkdir(exist_ok=True)
         LOG.debug('Creating %s in %s', i, cur_dir)
         create_single_file(cur_dir, 'random_{}'.format(i), sz)
+
+def create_files_constant_distr(sz: int, n: int, width: float):
+    pass
 
 def clear():
     """Remove the work dir with all its content"""
