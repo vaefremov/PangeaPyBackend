@@ -19,20 +19,29 @@ def create_single_file(parent_dir: pathlib.Path, nm: str, sz: int) -> None:
         f.write(prefix)
         f.write(os.urandom(sz))
 
-def const_size_iter(sz: int, width: float):
+def const_size_iter(sz: int, width: float) -> int:
     while True:
         yield sz
 
-def equal_distr_iter(sz: int, width: float):
+def equal_distr_iter(sz: int, width: float) -> int:
     start, stop = max(0, int(sz - sz*width)), int(sz + sz*width)+1
     while True:
         yield random.randrange(start, stop)
+
+def gauss_distr_iter(sz: int, width: float) -> int:
+    while True:
+        v = math.floor(random.gauss(sz, sz*width) + 0.5)
+        if v < 0:
+            continue
+        yield v
 
 def create_random_files_with_distr(sz:int, n: int, distr_name: str, width: float):
     if distr_name == 'const':
         gen = const_size_iter(sz, width)
     elif distr_name == 'equal':
         gen = equal_distr_iter(sz, width)
+    elif distr_name == 'gauss':
+        gen = gauss_distr_iter(sz, width)
     else:
         raise RuntimeError('Unknown distribution')
     work_dir = pathlib.Path(TEMP).joinpath('RandomFiles')

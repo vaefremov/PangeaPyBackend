@@ -10,6 +10,7 @@ from enum import Enum
 class DistrName(str, Enum):
     const = 'const'
     equal = 'equal'
+    gauss = 'gauss'
 
 import random
 import struct
