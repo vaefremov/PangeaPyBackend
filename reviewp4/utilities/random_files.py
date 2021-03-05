@@ -4,6 +4,7 @@ import pathlib
 import logging
 import shutil
 import random
+import math
 
 LOG = logging.getLogger(__name__)
 
@@ -58,7 +59,7 @@ def files_names_iter():
             continue
         yield str(f.absolute())
 
-def cache_status():
+def cache_status(n_channels: int=10):
     res = {}
     work_dir = pathlib.Path(TEMP) / 'RandomFiles'
     res['exists'] = work_dir.exists()
@@ -67,6 +68,7 @@ def cache_status():
         min_sz = 4_000_000_000
         tot_sz = 0
         n = 0
+        sizes = []
         for f in work_dir.rglob('*'):
             if f.is_dir():
                 continue
@@ -75,8 +77,24 @@ def cache_status():
             min_sz = min(sz, min_sz)
             tot_sz += sz
             n += 1
+            sizes.append(sz)
         res['max_sz'] = max_sz
         res['min_sz'] = min_sz
         res['tot_sz'] = tot_sz
         res['n'] = n
+        res['histogram'] = histogram(min_sz, max_sz, n_channels, sizes)
+    return res
+
+def histogram(start, end, n_channels, seq):
+    step = (end - start) / n_channels
+    if step == 0.0:
+        step = 1.0
+    res = {'n_channels': n_channels, 'values': [0 for _ in range(n_channels)], 'step': step}
+    for v in seq:
+        i = math.floor((v - start) / step)
+        if i < 0:
+            i = 0
+        if i >= n_channels:
+            i = max(0, n_channels-1)
+        res['values'][i] += 1
     return res
