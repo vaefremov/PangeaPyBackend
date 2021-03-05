@@ -6,6 +6,11 @@ import base64
 import tempfile
 from typing import Optional
 
+from enum import Enum
+class DistrName(str, Enum):
+    const = 'const'
+    equal = 'equal'
+
 import random
 import struct
 import os
@@ -110,7 +115,7 @@ async def randommsg(sz:int=Query(..., ge=1, description='Size of one chunk'),
 @router.get('/fill_cache')
 async def fill_cache(sz:int=Query(..., ge=1, description='Size of one file'), 
                 width_coeff: float=Query(0.0, description='Distribution width'),
-                distr_name: str=Query('const', description='Name of distribution (currently const and equal are supported)'),
+                distr_name: DistrName=Query('const', description='Name of distribution (currently const and equal are supported)'),
                 n: Optional[int]=Query(1, ge=1, description='Number of files to create')):
     """Create pool of random files, sizes are distributed according to the distr_name query parameter."""
     random_files.clear()
