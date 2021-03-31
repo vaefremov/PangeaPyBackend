@@ -1,11 +1,15 @@
 from fastapi import APIRouter, Depends, Header, Request, Response, Query
+from fastapi.responses import StreamingResponse
 import math
+import os
+import base64
 import logging
 
 from reviewp4.utilities.gen_utils import _createOrGetGeologicalObjects
 import reviewp4.db_internals.p4dbexceptions as p4dbexceptions
 import reviewp4.models as models
 import pangea
+import reviewp4.utilities.grid_utils as grid_utils
 
 from ..dependencies import get_connection, extract_name_from_header
 from ..utilities.gen_utils import pack_message
@@ -90,3 +94,18 @@ async def list_maps(project_name: str, grid_name:str, db = Depends(get_connectio
     ans = [ s[2] for s in subconts if s[1] == 'grd2']
     return ans
 
+@router.get('/grid_data/{project_name}/{grid_name:path}')
+async def grid_data(project_name: str, grid_name:str, map_name:str, db = Depends(get_connection)):
+    prid = db.getProjectByName(project_name)
+    mid = db.getContainerByName(prid, None, grid_name)
+    mpath = db.getContainerSingleAttribute(mid, 'Path')
+    mpath_abs = os.path.join(projRoot, mpath)
+    gid = db.getContainerByName(mid, 'grd2', map_name)
+    gpath = db.getContainerSingleAttribute(gid, 'Path')
+    gpath_abs = os.path.join(projRoot, gpath)
+    log.info('Getting data from file %s', gpath_abs)
+    gData = grid_utils.getEncodedGridDataFromFile(gpath_abs)
+    assert (gData[4] == 'lsb'), 'Wrong byte order in data, lsb expected, found %s' % gData[4]
+    del gData[4]
+    tmp_bin = grid_utils.encode_grid(gData)
+    return Response(content=tmp_bin, media_type='application/octet-stream')
