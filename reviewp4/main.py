@@ -2,7 +2,7 @@ from typing import Optional
 from fastapi import FastAPI, Depends, Header, Request, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.gzip import GZipMiddleware
-from .routers import misc, wells
+from .routers import misc, wells, maps
 import logging
 from .dependencies import get_connection
 from .db_internals.p4dbexceptions import DBAuthoritiesException, DBNotFoundException
@@ -26,6 +26,7 @@ def handle_auth_exception(req: Request, ex: DBNotFoundException):
 
 app.include_router(misc.router, prefix='/aux')
 app.include_router(wells.router, prefix='/wells')
+app.include_router(maps.router, prefix='/maps')
 
 
 @app.get('/users')
