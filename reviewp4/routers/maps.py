@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Header, Request, Response, Query
+import math
 import logging
 
 from reviewp4.utilities.gen_utils import _createOrGetGeologicalObjects
@@ -58,6 +59,28 @@ async def list_maps(project_name: str, db = Depends(get_connection)):
         res.append(cur_map)
     return {'maps': res, 'project': project_name}
 
+@router.get('/grid_geometry/{project_name}/{grid_name:path}')
+async def get_map_geometry(project_name: str, grid_name:str, db = Depends(get_connection)):
+    """Returns parameters of a concrete grid
+    """
+    prid = db.getProjectByName(project_name)
+    cid = db.getContainerByName(prid, 'map', grid_name)
+    Nx = db.getContainerSingleAttribute(cid, 'Nx')
+    Ny = db.getContainerSingleAttribute(cid, 'Ny')
+    orig = db.getContainerSingleAttribute(cid, 'Origin')
+    dx = db.getContainerSingleAttribute(cid, 'Dx')
+    dy = db.getContainerSingleAttribute(cid, 'Dy')
+    ans = {}
+    ans['numbers'] = [Nx, Ny]
+    ans['origin']= orig[0:2]
+    ans['dx'] = dx[0:2]
+    ans['dy'] = dy[0:2]
+    ans['alpha'] = math.atan2(dx[1], dx[0]) * (180./math.pi)
+    ans['step_x'] = math.sqrt(dx[0]*dx[0] + dx[1]*dx[1])
+    ans['step_y'] = math.sqrt(dy[0]*dy[0] + dy[1]*dy[1])
+    return ans
+
+
 @router.get('/list_maps/{project_name}/{grid_name:path}')
 async def list_maps(project_name: str, grid_name:str, db = Depends(get_connection)):
     log.info('Listing maps on grid %s', grid_name)
@@ -66,3 +89,4 @@ async def list_maps(project_name: str, grid_name:str, db = Depends(get_connectio
     subconts = db.getSubContainersListWithCAttribute(mid, 'Path')
     ans = [ s[2] for s in subconts if s[1] == 'grd2']
     return ans
+
