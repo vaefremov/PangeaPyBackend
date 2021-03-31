@@ -87,6 +87,8 @@ async def get_map_geometry(project_name: str, grid_name:str, db = Depends(get_co
 
 @router.get('/list_maps/{project_name}/{grid_name:path}')
 async def list_maps(project_name: str, grid_name:str, db = Depends(get_connection)):
+    """Returns list of maps (grid data) belonging to the specified grid
+    """
     log.info('Listing maps on grid %s', grid_name)
     prid = db.getProjectByName(project_name)
     mid = db.getContainerByName(prid, None, grid_name)
@@ -96,6 +98,9 @@ async def list_maps(project_name: str, grid_name:str, db = Depends(get_connectio
 
 @router.get('/grid_data/{project_name}/{grid_name:path}')
 async def grid_data(project_name: str, grid_name:str, map_name:str, db = Depends(get_connection)):
+    """Returns grid data in the following format:
+       <iidddddd + data(f4)
+    """
     prid = db.getProjectByName(project_name)
     mid = db.getContainerByName(prid, None, grid_name)
     mpath = db.getContainerSingleAttribute(mid, 'Path')
