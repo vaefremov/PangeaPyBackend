@@ -97,7 +97,9 @@ async def list_maps(project_name: str, grid_name:str, db = Depends(get_connectio
     return ans
 
 @router.get('/grid_data/{project_name}/{grid_name:path}')
-async def grid_data(project_name: str, grid_name:str, map_name:str, db = Depends(get_connection)):
+async def grid_data(project_name: str, grid_name:str, 
+                    name:str = Query(..., description="Name of the concrete map data"), 
+                    db = Depends(get_connection)):
     """Returns grid data in the following format:
        <iidddddd + data(f4)
     """
@@ -105,7 +107,7 @@ async def grid_data(project_name: str, grid_name:str, map_name:str, db = Depends
     mid = db.getContainerByName(prid, None, grid_name)
     mpath = db.getContainerSingleAttribute(mid, 'Path')
     mpath_abs = os.path.join(projRoot, mpath)
-    gid = db.getContainerByName(mid, 'grd2', map_name)
+    gid = db.getContainerByName(mid, 'grd2', name)
     gpath = db.getContainerSingleAttribute(gid, 'Path')
     gpath_abs = os.path.join(projRoot, gpath)
     log.info('Getting data from file %s', gpath_abs)
