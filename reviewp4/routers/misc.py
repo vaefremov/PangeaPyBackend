@@ -148,3 +148,9 @@ async def msgs_from_files(n: Optional[int]=Query(1, ge=1, description='Number of
     number of files that are in the cache (as has been specified while updating cache content with the fill_cache method)."""
     log.info('Outputting random messages as read from files, messages number=%d, delimiters: %s', n, delimit)
     return StreamingResponse(random_stream_files(n, delimit=delimit), media_type='application/octet-stream')
+
+@router.get('/list_projects')
+async def list_projects(db = Depends(get_connection)):
+        prl = db.getProjectsList()
+        out = [p[1] for p in prl]
+        return out
