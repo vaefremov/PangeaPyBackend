@@ -9,6 +9,7 @@ from typing import Optional, List
 import pickle
 
 import reviewp4.utilities.well_utils as well_utils
+import reviewp4.utilities.gen_utils as gen_utils
 from reviewp4.utilities.gen_utils import _createOrGetGeologicalObjects
 import reviewp4.db_internals.p4dbexceptions as p4dbexceptions
 import reviewp4.models as models
@@ -362,3 +363,78 @@ def getMultiwellMethodsInfo(project_name: str, body: List[models.WellMethodsList
     """
     prid = db.getProjectByName(project_name)
     return [i for i in multiwell_methods_info_iter(db, prid, body)]
+
+@router.get('/well_profiles_names_and_info/{project_name}')
+def getWellProfilesNamesAndInfo(project_name: str, db = Depends(get_connection)):
+    """Returns list of names and display information of well profile objects.
+    Return:
+    [ {'name': string, 'thickness': int, 'color': [int_r, int_g, int_b]} ]
+    """
+    log.debug("getWellProfilesNames %s", project_name)
+    
+    prid = db.getProjectByName(project_name)
+    mid = gen_utils._createOrGetMetaInf(db, prid)[0]
+    pl = db.getSubContainersListByType(mid, 'wprf')
+    ans = [{'name':s[1], 
+            'thickness': db.getContainerSingleAttributeWithDefault(s[0], 'thickness', 1), 
+            'number_of_wells': len(db.getContainerSingleAttributeWithDefault(s[0], 'Refs2wells', [])),
+            'color': db.getContainerSingleAttributeWithDefault(s[0], 'color', [0, 0, 0])} 
+        for s in pl]
+    # ans = [{'name':s[1], 
+    #         'thickness': db.getContainerSingleAttributeWithDefault(s[0], 'thickness', 1), 
+    #         'color': map(int, db.getContainerSingleAttributeWithDefault(s[0], 'color', [0, 0, 0])),
+    #         'number_of_wells': len(db.getContainerSingleAttributeWithDefault(s[0], 'Refs2wells', []))} for s in pl]
+    return ans
+
+
+@router.get('/log_method_names_for_profile/{project_name}')
+async def getProjectLogMethodsNames(project_name: str, profile_name: str = Query(..., description="name of wells profile (a named set of wells)"), db = Depends(get_connection)):
+    """Return list of well methods defined in project together with additional information,
+    such as method type, number of wells that contain this method.
+    Return:
+        List [ (method_name, format_string, number_of_containing_wells, ...), ... ]
+    May rise exceptions.
+    """
+    start_time = time.time()
+    
+    log.debug("getProjectLogMethodsNames %s", (project_name, profile_name))
+    # now, select boundaries
+    prid = db.getProjectByName(project_name)
+    mid = gen_utils._createOrGetMetaInf(db, prid)[0]
+    wpid = db.getContainerByName(mid, 'wprf', profile_name)
+    try:
+        wells_refs = db.getContainerArrayAttribute(wpid, 'Refs2wells')
+    except p4dbexceptions.DBException as e:
+        log.warning('Cannot access well profile %s in project %s ', profile_name, project_name)
+        wells_refs = []
+    ans = [(d[0].strip(), d[1], d[2]) for d in db.countParentContainersBySubcontainerNameAndAttrConstraintByList(prid, wells_refs, 'wel1', 'weld', 'format')]
+    d_bounds = dict(map(lambda p: (p[0].lower().strip(), p[1]), db.countParentContainersBySubcontainerNameConstraintByList(prid, wells_refs, 'wel1', 'wbnd')))
+    ans += [(p.strip(), 'boundary_method', d_bounds.get(p.lower().strip()) or 0) for p in db.getDistinctNamesByType(project_name, 'wbnd')]
+    log.debug("getProjectLogMethodsNames lasted (s): %s", -start_time + time.time())
+    return ans
+
+@router.post('/log_method_names/{project_name}')
+async def getProjectLogMethodsNamesForWells(project_name: str, wells_list: List[str], db = Depends(get_connection)):
+    """Return list of well methods defined in project together with additional information,
+    such as method type, number of wells that contain this method. Accepts JSON list of well names, empty list corresponds to
+    all wells in the project.
+    Return:
+        List [ (method_name, format_string, number_of_containing_wells, ...), ... ]
+    May rise exceptions.
+    """
+    start_time = time.time()
+    
+    log.debug("getProjectLogMethodsNamesForWells %s", (project_name, wells_list))
+    # now, select boundaries
+    prid = db.getProjectByName(project_name)
+    if len(wells_list) != 0:
+        wells_refs = [db.getContainerByName(prid, 'wel1', wn) for wn in wells_list]
+        ans = [(d[0].strip(), d[1], d[2]) for d in db.countParentContainersBySubcontainerNameAndAttrConstraintByList(prid, wells_refs, 'wel1', 'weld', 'format')]
+        d_bounds = dict(map(lambda p: (p[0].lower().strip(), p[1]), db.countParentContainersBySubcontainerNameConstraintByList(prid, wells_refs, 'wel1', 'wbnd')))
+        ans += [(p.strip(), 'boundary_method', d_bounds.get(p.lower().strip()) or 0) for p in db.getDistinctNamesByType(project_name, 'wbnd')]
+    else:        
+        ans = [(d[0].strip(), d[1], d[2]) for d in db.countParentContainersBySubcontainerNameAndAttr(prid, 'wel1', 'weld', 'format')]
+        d_bounds = dict(map(lambda p: (p[0].lower().strip(), p[1]), db.countParentContainersBySubcontainerName(prid, 'wel1', 'wbnd')))
+        ans += [(p.strip(), 'boundary_method', d_bounds.get(p.lower().strip()) or 0) for p in db.getDistinctNamesByType(project_name, 'wbnd')]
+    log.debug("getProjectLogMethodsNamesForWells lasted (s): %s", -start_time + time.time())
+    return ans
