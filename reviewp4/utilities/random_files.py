@@ -5,6 +5,7 @@ import logging
 import shutil
 import random
 import math
+from typing import Generator
 
 LOG = logging.getLogger(__name__)
 
@@ -19,16 +20,16 @@ def create_single_file(parent_dir: pathlib.Path, nm: str, sz: int) -> None:
         f.write(prefix)
         f.write(os.urandom(sz))
 
-def const_size_iter(sz: int, width: float) -> int:
+def const_size_iter(sz: int, width: float) -> Generator[int, None, None]:
     while True:
         yield sz
 
-def equal_distr_iter(sz: int, width: float) -> int:
+def equal_distr_iter(sz: int, width: float) -> Generator[int, None, None]:
     start, stop = max(0, int(sz - sz*width)), int(sz + sz*width)+1
     while True:
         yield random.randrange(start, stop)
 
-def gauss_distr_iter(sz: int, width: float) -> int:
+def gauss_distr_iter(sz: int, width: float) -> Generator[int, None, None]:
     while True:
         v = math.floor(random.gauss(sz, sz*width) + 0.5)
         if v < 0:
