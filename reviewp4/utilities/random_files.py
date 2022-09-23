@@ -47,7 +47,7 @@ def create_random_files_with_distr(sz:int, n: int, distr_name: str, width: float
         raise RuntimeError('Unknown distribution')
     work_dir = pathlib.Path(TEMP).joinpath('RandomFiles')
     work_dir.mkdir(exist_ok=True)
-    cur_dir = None
+    cur_dir = pathlib.Path('.')
     for i in range(n):
         if (i % MAX_NAMES) == 0:
             cur_dir = work_dir / str(i)
